@@ -1,0 +1,116 @@
+// Include ethers.js library (make sure you have it installed or include it via CDN)
+import { ethers } from "ethers";
+
+// Setup your provider (MetaMask, Infura, etc.)
+const provider = new ethers.providers.Web3Provider(window.ethereum);
+const signer = provider.getSigner();
+
+// Example ERC-20 contract ABI (to track token transfers)
+const tokenAbi = [
+  "event Transfer(address indexed from, address indexed to, uint256 value)"
+];
+
+// Assuming you have a contract address for the token
+const tokenAddress = "0xYourTokenAddress";
+
+// Example contract ABI (for tracking function calls, replace with your contract ABI)
+const contractAbi = [
+  "function yourFunction() public"
+];
+
+// Set the contract address
+const contractAddress = "0xYourContractAddress";
+
+// Tracker for user activity
+const userActivity = {
+  walletConnected: false,
+  transactions: [],
+  contractCalls: [],
+  tokenTransfers: []
+};
+
+// Function to initialize the dApp
+async function init() {
+  if (window.ethereum) {
+    try {
+      // Request user to connect their wallet
+      await window.ethereum.request({ method: "eth_requestAccounts" });
+      const accounts = await provider.listAccounts();
+      const userAddress = accounts[0];
+
+      userActivity.walletConnected = true;
+      console.log("Wallet connected: ", userAddress);
+      
+      // Listen for token transfers (ERC-20 transfer events)
+      const tokenContract = new ethers.Contract(tokenAddress, tokenAbi, provider);
+      tokenContract.on("Transfer", (from, to, value, event) => {
+        console.log(`Token transfer detected! From: ${from} To: ${to} Value: ${value.toString()}`);
+        userActivity.tokenTransfers.push({
+          from,
+          to,
+          value: ethers.utils.formatUnits(value, 18), // Assuming 18 decimals
+          timestamp: Date.now()
+        });
+      });
+
+      // Listen for contract function calls (replace with the actual function name you want to track)
+      const contract = new ethers.Contract(contractAddress, contractAbi, provider);
+      contract.on("YourEventName", (param1, param2, event) => {
+        console.log(`Contract event detected! Param1: ${param1} Param2: ${param2}`);
+        userActivity.contractCalls.push({
+          param1,
+          param2,
+          timestamp: Date.now()
+        });
+      });
+
+    } catch (error) {
+      console.error("Error connecting wallet: ", error);
+    }
+  } else {
+    console.error("Ethereum provider not found. Please install MetaMask.");
+  }
+}
+
+// Track token transfer function
+async function sendToken(receiver, amount) {
+  const tokenContract = new ethers.Contract(tokenAddress, tokenAbi, signer);
+  const tx = await tokenContract.transfer(receiver, ethers.utils.parseUnits(amount, 18));
+  console.log("Transaction sent: ", tx.hash);
+  await tx.wait();
+  userActivity.transactions.push({
+    type: "Token Transfer",
+    receiver,
+    amount,
+    txHash: tx.hash,
+    timestamp: Date.now()
+  });
+}
+
+// Track contract interaction (example)
+async function interactWithContract() {
+  const contract = new ethers.Contract(contractAddress, contractAbi, signer);
+  const tx = await contract.yourFunction();
+  console.log("Transaction sent: ", tx.hash);
+  await tx.wait();
+  userActivity.transactions.push({
+    type: "Contract Interaction",
+    function: "yourFunction",
+    txHash: tx.hash,
+    timestamp: Date.now()
+  });
+}
+
+// Function to log all user activity
+function logUserActivity() {
+  console.log("User Activity: ", userActivity);
+}
+
+// Initialize and track user activity on page load
+window.onload = init;
+
+// Example: Call these functions on appropriate user actions
+// sendToken("0xReceiverAddress", "100"); // To send tokens
+// interactWithContract(); // To interact with the smart contract
+// logUserActivity(); // To see tracked activity
+
